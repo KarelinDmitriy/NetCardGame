@@ -26,7 +26,7 @@ namespace Core.CardClasses
 
         public byte[] Pack()
         {
-            byte[] res = new byte[2];
+            var res = new byte[2];
             res[0] = (byte)Suit;
             res[1] = (byte)Value;
             return res;
@@ -36,10 +36,11 @@ namespace Core.CardClasses
         {
             if (arr.Length != 2)
                 throw new InvalidOperationException("Не возможно распакавать карту");
-            Suit suit;
+            if (arr[0] == 0 && arr[1] == 0)
+                return null;
             try
             {
-                suit = (Suit)arr[0];
+                var suit = (Suit)arr[0];
                 int val = arr[1];
                 if (val < 6 || val > 14)
                     throw new InvalidOperationException("Не возможно распакавать карту");
@@ -66,10 +67,26 @@ namespace Core.CardClasses
                     res += "H";
                     break;
                 case Suit.Spedes:
-                    res += "C";
+                    res += "S";
                     break;
             }
-            return res + Value;
+            return  Value+res;
+        }
+
+        public override int GetHashCode()
+        {
+            return Value + 20*(int) Suit;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(this, obj)) return true;
+            if (ReferenceEquals(null, obj)) return false;
+            var card = obj as Card;
+            if (ReferenceEquals(card, null)) return false;
+            if (card.Suit == Suit && card.Value == Value)
+                return true;
+            return false;
         }
     }
 }

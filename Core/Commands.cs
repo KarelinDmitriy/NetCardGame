@@ -1,26 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace Core
+﻿namespace Core
 {
     public enum ServerCommands
     {
-        Login,
+        Login = 1,
         Logout,
-        Put, 
+        Put,
         Ready
     }
 
     public enum ClientCommands
     {
-        NewGame,
-        NextStep,
-        AddCard,
-        Win, 
-        Lose,
-        NewPlayer,
-        PlayerStep
+        NewGame = 1,
+        RefreshBoard,
+        Win,
+        Lose, 
     }
 }

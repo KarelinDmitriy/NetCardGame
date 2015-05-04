@@ -1,19 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Core.CardClasses
 {
     public class Player
     {
-        Queue<Card> cards = new Queue<Card>();
-        List<Card> inHand = new List<Card>();
+        private readonly Queue<Card> cards = new Queue<Card>();
+        private readonly List<Card> inHand = new List<Card>();
         public bool IsReady { get; set; }
-
-        public Player()
-        {
-        }
 
         public void AddCard(Card card)
         {
@@ -46,6 +41,11 @@ namespace Core.CardClasses
         public bool IsLose()
         {
             return Count() == 0;
+        }
+
+        public byte[] GetCards4Send()
+        {
+            return inHand.SelectMany(x => x.Pack()).ToArray();
         }
     }
 }
