@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -17,6 +16,10 @@ namespace CardGame.Net
         public List<Card> Cards { get; set; }
         public Card CardInGame { get; set; }
         public bool IsReady { get; set; }
+        public bool InDispute { get; set; }
+        public bool IsWinInStep { get; set; }
+        public bool IsLose { get; set; }
+        public byte CardCount { get; set; }
     }
 
     public class Client
@@ -29,7 +32,7 @@ namespace CardGame.Net
         private readonly object locker = new object();
         private readonly Queue<byte[]> commands = new Queue<byte[]>();
         private bool isLose = true;
-        private Action<string> log;
+        private readonly Action<string> log;
 
         private const int BufferSize = 1024;
 
@@ -73,7 +76,7 @@ namespace CardGame.Net
             try
             {
                 log("Отправка ReadyRequest");
-                var request = new[] { (byte)ServerCommands.Ready };
+                var request = new[] {(byte) ServerCommands.Ready};
                 serverSocket.Send(request);
             }
             catch (Exception)
@@ -89,7 +92,7 @@ namespace CardGame.Net
             if (data.Cards.Count < i)
                 return;
             log("Отправка PutRequest");
-            var requers = new[] { (byte)ServerCommands.Put, (byte)i };
+            var requers = new[] {(byte) ServerCommands.Put, (byte) i};
             serverSocket.Send(requers);
         }
 
@@ -133,7 +136,7 @@ namespace CardGame.Net
                     continue;
                 try
                 {
-                    var type = (ClientCommands)command[0];
+                    var type = (ClientCommands) command[0];
                     switch (type)
                     {
                         case ClientCommands.Lose:

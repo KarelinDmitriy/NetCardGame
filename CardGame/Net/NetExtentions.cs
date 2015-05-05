@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Core;
 using Core.CardClasses;
 
 namespace CardGame.Net
@@ -13,17 +12,25 @@ namespace CardGame.Net
         {
             byte msgLength = 0;
             var nameUtf8 = Encoding.UTF8.GetBytes(name);
-            var nameLength = (byte)nameUtf8.Length;
+            var nameLength = (byte) nameUtf8.Length;
             var inHand = player.Player.GetCards4Send();
-            var inHandLength = (byte)inHand.Length;
+            var inHandLength = (byte) inHand.Length;
             var inGame = player.CardInGame.SafeGetTopCard();
-            var status = new[] { player.IsLose ? (byte)2 : (byte)1 };
-            msgLength = (byte)(1 + (1 + nameLength) + (1 + inHandLength) + 2 + 1);
+            var status = new[] {player.IsLose ? (byte) 2 : (byte) 1};
+            var isDispute = new[] {player.InDispute ? (byte) 2 : (byte) 1};
+            var isWinInStep = new[] {player.IsWinInStep ? (byte) 2 : (byte) 1};
+            var isLose = new[] {player.IsLose ? (byte) 2 : (byte) 1};
+            var cardCount = new[] {(byte) player.Player.Count()};
+            msgLength = (byte) (1 + (1 + nameLength) + (1 + inHandLength) 
+                + 2 + 1 + 1 + 1 + 1 + 1);
             var result = new Byte[3];
             result[0] = msgLength;
             result[1] = nameLength;
             result[2] = inHandLength;
-            return result.Concat(nameUtf8).Concat(inHand).Concat(inGame).Concat(status).ToArray();
+            return result.Concat(nameUtf8).Concat(inHand)
+                .Concat(inGame).Concat(status)
+                .Concat(isDispute).Concat(isWinInStep)
+                .Concat(isLose).Concat(cardCount).ToArray();
         }
 
         public static byte[] PackGameToPlayers(this IDictionary<string, PlayerInfo> info)
@@ -34,7 +41,7 @@ namespace CardGame.Net
         public static byte[] PackPlayerName(this string name)
         {
             var bName = Encoding.UTF8.GetBytes(name);
-            return new[] { (byte)bName.Length }.Concat(bName).ToArray();
+            return new[] {(byte) bName.Length}.Concat(bName).ToArray();
         }
 
         public static List<PlayerData> UnpackPlayerInfo(this byte[] array)
@@ -67,6 +74,10 @@ namespace CardGame.Net
             var inG = array.GetSubArray(3 + nameLength + cardCount*2, 2);
             result.CardInGame = Card.Unpack(inG);
             result.IsReady = array[3 + nameLength + cardCount*2 + 2] == 2;
+            result.InDispute = array[3 + nameLength + cardCount*2 + 3] == 2;
+            result.IsWinInStep = array[3 + nameLength + cardCount*2 + 4] == 2;
+            result.IsLose = array[3 + nameLength + cardCount*2 + 5] == 2;
+            result.CardCount = array[3 + nameLength + cardCount*2 + 6];
             return result;
         }
 

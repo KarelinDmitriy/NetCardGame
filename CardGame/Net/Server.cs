@@ -91,14 +91,14 @@ namespace CardGame.Net
 
         private void ClinetThread(object obj)
         {
-            var sock = (Socket) obj;
+            var sock = (Socket)obj;
             var name = string.Empty;
             try
             {
                 //ожидаем login
                 var buffer = new byte[BufferSize];
                 var msgLength = sock.Receive(buffer);
-                var сmd = (ServerCommands) buffer[0];
+                var сmd = (ServerCommands)buffer[0];
                 if (сmd != ServerCommands.Login)
                 {
                     SayDisconect(sock);
@@ -122,7 +122,7 @@ namespace CardGame.Net
                     players.Add(name, new PlayerInfo(sock));
                     if (players.Count == 3)
                         StartGame();
-                    var listener = new Thread(Listen) {IsBackground = true};
+                    var listener = new Thread(Listen) { IsBackground = true };
                     listener.Start(name);
                 } //
                 while (true)
@@ -151,7 +151,7 @@ namespace CardGame.Net
         private void Listen(object obj)
         {
             var name = (string)obj;
-            log("Запущен сборщик комадн от "+name);
+            log("Запущен сборщик комадн от " + name);
             var info = players[name];
             var commands = players[name].Commands;
             while (players.ContainsKey(name))
@@ -192,42 +192,60 @@ namespace CardGame.Net
         private void Put(byte[] arr, string name)
         {
             log("Получет PutRequest от " + name);
-            if (players[name].CanMove)
+            if (!players[name].CanMove) return;
+            var card = players[name].Player.GetCard(arr[1]);
+            players[name].CardInGame.Push(card);
+            players[name].Player.IsReady = false;
+            players[name].CanMove = false;
+            lock (locker)
             {
-                var card = players[name].Player.GetCard(arr[1]);
-                players[name].CardInGame.Push(card);
-                players[name].Player.IsReady = false;
-                players[name].CanMove = false;
-                var answer = BuildRefreshCommand();
-                SendAll(answer);
+                Check();
             }
+            var answer = BuildRefreshCommand();
+            SendAll(answer);
         }
 
-        private void Ready(byte[] command, string name)
+        private void Check()
         {
-            //нужно ли проверять готовность или сразу ставить true
-            log("Получет ReadyRequest от " + name);
-            if (!players[name].CanMove)
-                players[name].Player.IsReady = true;
-            if (players.Where(x => !x.Value.IsLose).All(x => x.Value.Player.IsReady))
+            log("Проверка состояния после хода");
+            //если никто не может ходить, вычисляем состояние
+            if (!AnyCanMove())
             {
-                lock (locker)
+                //проверяем, находимся ли мы с стадии спора
+                if (players.Any(x => x.Value.InDispute))
                 {
-                    FindWinner();
-                }//нужна ли в этом месте синхронизация?
+                    var duplicatePlayers = players.Where(x => x.Value.InDispute).Select(x => x.Key);
+                    var winValue = players.Where(x => duplicatePlayers.Contains(x.Key))
+                        .Max(x => x.Value.CardInGame.Peek().Value);
+                    var wins = players
+                        .Where(x => duplicatePlayers.Contains(x.Key) 
+                            && x.Value.CardInGame.Peek().Value == winValue)
+                        .Select(x => x.Key).ToArray();
+                    foreach (var pl in  players.Where(x=>x.Value.InDispute).Select(x=>x.Value))
+                    {
+                        pl.InDispute = false;
+                    }
+                    DoSomethingWithWinners(wins);
+                } //если никто не спорит
+                else
+                {
+                    var winValue = players.Where(x=>!x.Value.IsLose)
+                        .Max(x => x.Value.CardInGame.Peek().Value);
+                    var wins = players
+                        .Where(x => x.Value.CardInGame.Peek().Value == winValue)
+                        .Select(x => x.Key)
+                        .ToArray();
+                    DoSomethingWithWinners(wins);
+                }
             }
         }
 
-        private void FindWinner()
+        private void DoSomethingWithWinners(string[] wins)
         {
-            log("Определяется победитель в текущем шаге");
-            var winValue = players.Max(x => x.Value.CardInGame.Peek().Value);
-            var wins = players.Where(x => x.Value.CardInGame.Peek().Value == winValue).Select(x => x.Key).ToArray();
             if (wins.Count() > 1)
             {
-                //TODO сделать спор
                 log("Зафиксирован спор");
-                foreach (var player in players.Where(x=>wins.Contains(x.Key)))
+                foreach (var player in players.Where(x => wins.Contains(x.Key)))
                 {
                     player.Value.InDispute = true;
                 }
@@ -236,17 +254,16 @@ namespace CardGame.Net
             {
                 log("Победа в шаге: " + wins[0]);
                 var prize = players.SelectMany(x => x.Value.CardInGame);
-                foreach (var playerInfo in players)
-                {
-                    playerInfo.Value.CardInGame.Clear();
-                }
                 foreach (var card in prize)
                 {
                     players[wins[0]].Player.AddCard(card);
                 }
                 players[wins[0]].IsWinInStep = true;
             }
-            var losers = players.Where(x => x.Value.Player.IsLose()).Select(x => x.Key).ToArray();
+            var losers = players
+                .Where(x => x.Value.Player.IsLose())
+                .Select(x => x.Key)
+                .ToArray();
             foreach (var loser in losers.Where(loser => !players[loser].IsLose))
             {
                 //проиграл только сейчас
@@ -255,24 +272,65 @@ namespace CardGame.Net
                 log("Следующий игрок проиграл: " + loser);
                 SendAll(msg);
             }
-            if (losers.Length == 2)
+            if (players.Count(x => x.Value.IsLose) == 2)
             {
                 var winnerName = players.Select(x => x.Key).Except(losers).Single();
                 var msg = BuildWinMessage(winnerName);
                 log("Победитель игры: " + winnerName);
                 SendAll(msg);
             }
-            else
+        }
+
+        private bool AnyCanMove()
+        {
+            return players.Any(x => x.Value.CanMove);
+        }
+
+        private void Ready(byte[] command, string name)
+        {
+            //нужно ли проверять готовность или сразу ставить true
+            log("Получет ReadyRequest от " + name);
+            if (!players[name].CanMove)
+                players[name].Player.IsReady = true;
+            lock (locker)
             {
-                log("Переход к следующему шагу");
-                var answer = BuildRefreshCommand();
-                foreach (var pl in players.Values)
+                NextStepChecker();
+            }//нужна ли в этом месте синхронизация?
+        }
+
+        private void NextStepChecker()
+        {
+            log("Определяется победитель в текущем шаге");
+            if (AllReady())
+            {
+                //если не в стадии спора, то очищаем стеки, иначе нет
+                var inDispute = players.Any(x => x.Value.InDispute);
+                foreach (var playerInfo in players.Where(x=>!x.Value.IsLose).Select(x=>x.Value))
                 {
-                    pl.CanMove = true;
-                    pl.Player.IsReady = false;
+                    playerInfo.IsWinInStep = false;
+                    if (inDispute)
+                    {
+                        if (playerInfo.InDispute)
+                        {
+                            playerInfo.CanMove = true;
+                            playerInfo.Player.IsReady = false;
+                        }
+                    }
+                    else
+                    {
+                        playerInfo.CardInGame.Clear();
+                        playerInfo.CanMove = true;
+                        playerInfo.Player.IsReady = false;
+                    }
                 }
+                var answer = BuildRefreshCommand();
                 SendAll(answer);
             }
+        }
+
+        private bool AllReady()
+        {
+            return players.Where(x => !x.Value.IsLose).All(x => x.Value.Player.IsReady);
         }
 
         private void SayDisconect(Socket socket)

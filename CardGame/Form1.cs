@@ -75,6 +75,7 @@ namespace CardGame
             try
             {
                 clientSocket.Bind(ep);
+                clientSocket.ReceiveTimeout = 1000;
                 EndPoint endPoint = new IPEndPoint(IPAddress.Parse("192.168.0.255"), Constants.ServerUdpPort);
                 clientSocket.SendTo(new byte[1], endPoint);
                 var buffer = new byte[Constants.BufferSize];
@@ -84,7 +85,7 @@ namespace CardGame
             }
             catch (SocketException ex)
             {
-                MessageBox.Show(@"Ошибка подключения. Поиск серверов не будет проведен");
+                MessageBox.Show(@"Сервера не найдены");
             }
             finally
             {
