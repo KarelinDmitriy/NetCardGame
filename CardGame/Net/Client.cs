@@ -36,6 +36,8 @@ namespace CardGame.Net
 
         private const int BufferSize = 1024;
 
+        public bool Disconnected { get; private set; }
+
         public Client(string name, Painter painter, Action<string> showMessage, Action<string> log)
         {
             this.name = name;
@@ -63,20 +65,42 @@ namespace CardGame.Net
                 thread.Start();
                 var thread2 = new Thread(Listen) {IsBackground = true};
                 thread2.Start();
+                Disconnected = false;
             }
             catch (Exception)
             {
+                Disconnect();
                 showMessage("Не удалось подключиться к серверу");
+            }
+        }
+
+        public void Disconnect()
+        {
+            Disconnected = true;
+            if (serverSocket != null)
+            {
+                try
+                {
+                    serverSocket.Close();
+                    serverSocket = null;
+                }
+                catch (Exception)
+                {
+                    //ничего не делаем при ошибке
+                }
+                showMessage("Соеденение с сервером разорвано");
             }
         }
 
         public void Ready()
         {
             if (isLose) return;
+            if (Disconnected)
+                return;
             try
             {
                 log("Отправка ReadyRequest");
-                var request = new[] {(byte) ServerCommands.Ready};
+                var request = new[] { (byte)ServerCommands.Ready };
                 serverSocket.Send(request);
             }
             catch (Exception)
@@ -88,12 +112,28 @@ namespace CardGame.Net
         public void Put(int i)
         {
             if (isLose) return;
-            var data = players.First(x => x.Name == name);
-            if (data.Cards.Count < i)
+            if (Disconnected)
                 return;
+            try
+            {
+                var data = players.First(x => x.Name == name);
+                if (data.Cards.Count < i)
+                    return;
+            }
+            catch (Exception)
+            {
+                return;
+            }
             log("Отправка PutRequest");
-            var requers = new[] {(byte) ServerCommands.Put, (byte) i};
-            serverSocket.Send(requers);
+            var requers = new[] { (byte)ServerCommands.Put, (byte)i };
+            try
+            {
+                serverSocket.Send(requers);
+            }
+            catch (SocketException ex)
+            {
+                Disconnect();
+            }
         }
 
         private void CommandsReader()
@@ -114,11 +154,7 @@ namespace CardGame.Net
             }
             catch (SocketException ex)
             {
-                //todo подумать, что тут сделать
-            }
-            finally
-            {
-                serverSocket.Close();
+                Disconnect();
             }
         }
 
@@ -156,7 +192,7 @@ namespace CardGame.Net
                 catch (InvalidCastException)
                 {
                     showMessage("Получена не верная команда с сервера.\nВозможна попытка взлома.\nСоеденение прервано");
-                    serverSocket.Disconnect(false); //todo проверить, как работает
+                    Disconnect();
                     return;
                 }
             }

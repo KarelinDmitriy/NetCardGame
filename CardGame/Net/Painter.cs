@@ -74,9 +74,13 @@ namespace CardGame.Net
             var text = data.Name;
             if (data.IsLose)
                 text += " (проиграл)";
-            else text += " (" + data.CardInGame+ ")";
+            else text += " (" + data.CardCount+ ")";
             var status = data.IsReady ? "Готов" : "Не готов";
-            buffer.Graphics.DrawString(status, font, white, x, 20);
+            if (data.InDispute)
+            {
+                buffer.Graphics.DrawString("Спорит", font, white, x, 10);
+            }
+            buffer.Graphics.DrawString(status, font, white, x, 30);
             buffer.Graphics.DrawString(text, font, white, x, 50);
             if (data.CardInGame != null)
             {

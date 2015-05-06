@@ -115,7 +115,7 @@ namespace CardGame
             {
                 var ip = (string) ServerList.SelectedItem;
                 var endPoint = new IPEndPoint(IPAddress.Parse(ip), Constants.ServerGamePort);
-                if (clinet != null)
+                if (clinet != null && !clinet.Disconnected)
                 {
                     ShowMessage("Клиент уже создан");
                 }

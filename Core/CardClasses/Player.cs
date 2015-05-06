@@ -24,6 +24,8 @@ namespace Core.CardClasses
 
         public Card GetCard(int i)
         {
+            if (inHand.Count <= i)
+                return null;
             var res = inHand[i];
             inHand.RemoveAt(i);
             if (cards.Any())

@@ -16,7 +16,7 @@ namespace CardGame.Net
             var inHand = player.Player.GetCards4Send();
             var inHandLength = (byte) inHand.Length;
             var inGame = player.CardInGame.SafeGetTopCard();
-            var status = new[] {player.IsLose ? (byte) 2 : (byte) 1};
+            var status = new[] {player.Player.IsReady ? (byte) 2 : (byte) 1};
             var isDispute = new[] {player.InDispute ? (byte) 2 : (byte) 1};
             var isWinInStep = new[] {player.IsWinInStep ? (byte) 2 : (byte) 1};
             var isLose = new[] {player.IsLose ? (byte) 2 : (byte) 1};
